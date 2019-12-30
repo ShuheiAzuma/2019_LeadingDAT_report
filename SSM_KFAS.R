@@ -1,5 +1,5 @@
-rm(list = ls())
 
+rm(list = ls())
 
 # load library ------------------------------------------------------------
 
@@ -225,7 +225,7 @@ plot_aic <- ggplot(df_AIC,
   geom_hline(aes(yintercept = min(AIC_culc)),
              colour = "tomato",
              lty = "dashed") +
-  coord_flip(ylim = c(3000, 3750)) +
+  coord_cartesian(ylim = c(3000, 3750)) +
   NULL
 
 ggsave(plot_aic, filename = "./003__output/plot_aic.png",
@@ -253,7 +253,6 @@ plot_pred <- ggplot(x,
               alpha = 0.4) +
   geom_line(aes(y = fit),
             colour = "lightblue",
-            size = 3,
             alpha = 0.8) +
   
   geom_line(alpha = 0.6) +
@@ -296,10 +295,10 @@ model_1_s <- function(x, q){
   
 }
 
-result_model_1_s_fluct <- model_1_s(germany_ts, NA)
+result_model_1_s <- model_1_s(germany_ts, NA)
 
-res_obs <- rstandard(result_model_1_s_fluct$kfs, "pearson")
-res_state <- rstandard(result_model_1_s_fluct$kfs, "state")[, 1]
+res_obs <- rstandard(result_model_1_s$kfs, "pearson")
+res_state <- rstandard(result_model_1_s$kfs, "state")[, 1]
 
 germany_res <- x %>% 
   select(year_month, germany) %>% 
@@ -376,7 +375,7 @@ model_1_s_ar <- function(x){
   
   mod <- SSModel(x ~ SSMtrend(1, Q = NA) +
                    SSMseasonal(12, NA) +
-                   SSMarima(ar = 0.5, Q = NA),
+                   SSMarima(ar = 0,  Q = NA),
                  H = NA)
 
   updatefn <- function(pars, model){
@@ -424,7 +423,7 @@ plot_pred <- ggplot(x_add,
               alpha = 0.4) +
   geom_line(aes(y = fit),
             colour = "lightblue",
-            size = 3,
+            size = 0.5,
             alpha = 0.8) +
   
   geom_line(alpha = 0.6) +
@@ -467,7 +466,7 @@ level <- tibble(pred_level = result_model_1_s_fluct_na$kfs$alphahat[, "level"] %
 x_add <- x %>%
   na.omit() %>% 
   select(year_month, germany) %>% 
-  mutate_at(vars(germany), ~ log(.)) %>% 
+  # mutate_at(vars(germany), ~ log(.)) %>%
   bind_cols(alphahatconf,
             level)
 
@@ -518,8 +517,8 @@ ggsave(plot_pred, filename = "./003__output/plot_pred_na_model_with_pred.png",
 
 
 germany_ts <- germany_ts %>% na.omit()
-shiftlevel <- (1:NROW(germany_ts_log) >= which(x$year_month == as.Date("2011-01-01")))
-shiftSlope <- 1:NROW(germany_ts_log) - which(x$year_month == as.Date("2011-01-01"))
+shiftlevel <- (1:NROW(germany_ts) >= which(x$year_month == as.Date("2011-01-01")))
+shiftSlope <- 1:NROW(germany_ts) - which(x$year_month == as.Date("2011-01-01"))
 shiftSlope <- ifelse(shiftSlope < 0, 0, shiftSlope)
 
 model_1_s_interferance <- function(x, q){
@@ -537,7 +536,7 @@ model_1_s_interferance <- function(x, q){
               kfs = kfs))
 }
 
-result_model_1_s_interferance <- model_1_s_interferance(germany_ts_log, NA)
+result_model_1_s_interferance <- model_1_s_interferance(germany_ts, NA)
 
 
 AIC_interf <- AIC_ammend(result_model_1_s_interferance$kfs, degree = 3 + 1 + 1 + 11)
@@ -600,6 +599,7 @@ ggsave(plot_pred, filename = "./003__output/plot_pred_na_model_with_pred.png",
 df_AIC_2 <- tibble(model_name = c("3-1_NA_model", "3-2_AR_model", "3-3_Interferance_slope_model"),
                    AIC_culc = c(AIC_na, AIC_ar, AIC_interf))
 
+# write_csv(df_AIC_2, path = "./003__output/df_AIC_2.csv")
 
 plot_aic <- ggplot(df_AIC_2,
                    aes(x = model_name, y = AIC_culc)) +
@@ -673,15 +673,34 @@ plot_pred <- ggplot(x_add,
              alpha = 0.6) +
   
   expand_limits(y = 0) +
-  
+  scale_y_continuous(breaks = seq(0, 30000, 5000)) +
   scale_x_date(date_labels = "%y/%m",
-               date_breaks = "1 year",
-  limit=c(as.Date("2003-01-01"), as.Date("2019-12-01"))) +
+               date_breaks = "2 month",
+  limit=c(as.Date("2018-01-01"), as.Date("2019-12-01"))) +
   
   labs(x = "Year/Month",
        y = "Number of foreign visitors from Germany") +
   
+  theme(axis.text.y = element_text(size = 10)) +
+  
   NULL
 
 plot_pred
+
+ggsave(plot_pred, filename = "./003__output/plot_pred_na_model_with_pred_from2018-.png",
+       width = 6,
+       height = 4)
+
+
+
+# table of prediction -----------------------------------------------------
+
+x_add %>% select(year_month,
+                 fit,
+                 lwr,
+                 upr) %>% 
+  filter(year_month >= as.Date("2019-01-01")) %>% 
+  mutate_if(is.numeric, round, 1) %>% 
+  kable()
+
 
